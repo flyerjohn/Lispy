@@ -1,3 +1,7 @@
+import math
+import operator as op
+
+
 # Type Definitions
 Symbol = str
 Number = (int, float)
@@ -36,6 +40,59 @@ def atom(token: str) -> Atom: # numbers become numbers and every other token is 
         except ValueError:
             return Symbol(token)
 
+def standard_env() -> Env:
+    # An environment with some Scheme standard procedures.
+    env = Env()
+    env.update(vars(math)) # sin, cos, sqrt, pi, ...
+    env.update({
+        '+':op.add, '-':op.sub, '*':op.mul, '/':op.truediv, 
+        '>':op.gt, '<':op.lt, '>=':op.ge, '<=':op.le, '=':op.eq, 
+        'abs':     abs,
+        'append':  op.add,  
+        'apply':   lambda proc, args: proc(*args),
+        'begin':   lambda *x: x[-1],
+        'car':     lambda x: x[0],
+        'cdr':     lambda x: x[1:], 
+        'cons':    lambda x,y: [x] + y,
+        'eq?':     op.is_, 
+        'expt':    pow,
+        'equal?':  op.eq, 
+        'length':  len, 
+        'list':    lambda *x: List(x), 
+        'list?':   lambda x: isinstance(x, List), 
+        'map':     map,
+        'max':     max,
+        'min':     min,
+        'not':     op.not_,
+        'null?':   lambda x: x == [], 
+        'number?': lambda x: isinstance(x, Number),  
+		'print':   print,
+        'procedure?': callable,
+        'round':   round,
+        'symbol?': lambda x: isinstance(x, Symbol),
+    })
+    return env
+
+global_env = standard_env()
+
+def eval(x: Exp, env=global_env) -> Exp:
+    # Evaluate an expression in an environment.
+    if isinstance(x, Symbol):        # variable reference
+        return env[x]
+    elif isinstance(x, Number):      # constant number
+        return x                
+    elif x[0] == 'if':               # conditional
+        (_, test, conseq, alt) = x
+        exp = (conseq if eval(test, env) else alt)
+        return eval(exp, env)
+    elif x[0] == 'define':           # definition
+        (_, symbol, exp) = x
+        env[symbol] = eval(exp, env)
+    else:                            # procedure call
+        proc = eval(x[0], env)
+        args = [eval(arg, env) for arg in x[1:]]
+        return proc(*args)
+
 
 a = "(begin (define r 10) (* pi (* r r)))"
-print(parser(a))
+print(eval(parser(a)))
